@@ -1,72 +1,106 @@
-#Create a simulator object
-set ns [new Simulator]
+# --- Seyyed Mohammad Hosseini
+# --- seyyedmohammad.ir
+# --- 11-02-2016
+# --- Implementation scenarios wireless connection, two nodes by other wireless node 
 
-#Define different colors for data flows (for NAM)
-$ns color 1 Red
+set val(chan)           Channel/WirelessChannel    ;# channel type
+set val(prop)           Propagation/TwoRayGround   ;# radio- 
+set val(netif)          Phy/WirelessPhy            ;# network 
+set val(mac)            Mac/802_11                 ;# MAC type
+set val(ifq)            Queue/DropTail/PriQueue    ;# interface queue 
+set val(ll)             LL                         ;# link layer type
+set val(ant)            Antenna/OmniAntenna        ;# antenna model
+set val(ifqlen)         50                         ;# max packet in ifq
+set val(nn)             3                          ;# number of mobile
+set val(rp)             DSR                        ;# routing protocol
+set val(x)              500                        ;# routing protocol
+set val(y)              400                        ;# routing protocol
+set val(stop)           150                        ;# routing protocol
+
+set ns              [new Simulator]
+
+set tracefd       [open dsr.tr w]
+set windowVsTime2 [open win.tr w]
+set namtrace      [open dsr.nam w]   
+
+$ns trace-all $tracefd
+$ns namtrace-all-wireless $namtrace $val(x) $val(y)
+
+set topo       [new Topography]
+
+$topo load_flatgrid $val(x) $val(y)
+
+create-god $val(nn)
 
 
-#Open the NAM trace file
-set nf [open out.nam w]
-$ns namtrace-all $nf
-
-#Define a 'finish' procedure
-proc finish {} {
-        global ns nf
-        $ns flush-trace
-        #Close the NAM trace file
-        close $nf
-        #Execute NAM on the trace file
-        exec nam out.nam &
-        exit 0
+$ns node-config -adhocRouting $val(rp) \
+           -llType $val(ll) \
+           -macType $val(mac) \
+           -ifqType $val(ifq) \
+           -ifqLen $val(ifqlen) \
+           -antType $val(ant) \
+           -propType $val(prop) \
+           -phyType $val(netif) \
+           -channelType $val(chan) \
+           -topoInstance $topo \
+           -agentTrace ON \
+           -routerTrace ON \
+           -macTrace OFF \
+           -movementTrace ON
+           
+for {set i 0} {$i < $val(nn) } { incr i } {
+    set node_($i) [$ns node]     
 }
 
+$node_(0) set X_ 100.0
+$node_(0) set Y_ 100.0
+$node_(0) set Z_ 0.0
 
-set n0 [$ns node]
-set n2 [$ns node]
-set n3 [$ns node]
+$node_(1) set X_ 400.0
+$node_(1) set Y_ 100.0
+$node_(1) set Z_ 0.0
 
-#Create links between the nodes
-$ns duplex-link $n0 $n2 2Mb 10ms DropTail
-$ns duplex-link $n2 $n3 1.7Mb 20ms DropTail
+$node_(2) set X_ 250.0
+$node_(2) set Y_ 100.0
+$node_(2) set Z_ 0.0
 
-#Set Queue Size of link (n2-n3) to 10
-$ns queue-limit $n2 $n3 10
-
-#Give node position (for NAM)
-$ns duplex-link-op $n0 $n2 orient right
-$ns duplex-link-op $n2 $n3 orient right
-
-#Monitor the queue for link (n2-n3). (for NAM)
-$ns duplex-link-op $n2 $n3 queuePos 0.5
-
-
-#Setup a TCP connection
-set tcp [new Agent/TCP]
+set tcp [new Agent/TCP/Newreno]
 $tcp set class_ 2
-$ns attach-agent $n0 $tcp
-
 set sink [new Agent/TCPSink]
-$ns attach-agent $n3 $sink
+$ns attach-agent $node_(0) $tcp
+$ns attach-agent $node_(1) $sink
 $ns connect $tcp $sink
-$tcp set fid_ 1
-
-#Setup a FTP over TCP connection
 set ftp [new Application/FTP]
 $ftp attach-agent $tcp
-$ftp set type_ FTP
+$ns at 0.0 "$ftp start"
 
+# Printing the window size
+proc plotWindow {tcpSource file} {
+global ns
+set time 0.01
+set now [$ns now]
+set cwnd [$tcpSource set cwnd_]
+puts $file "$now $cwnd"
+$ns at [expr $now+$time] "plotWindow $tcpSource $file" }
+$ns at 10.1 "plotWindow $tcp $windowVsTime2" 
 
-#Schedule events for the CBR and FTP agents
-$ns at 0 "$ftp start"
-$ns at 5 "$ftp stop"
+for {set i 0} {$i < $val(nn)} { incr i } {
+    $ns initial_node_pos $node_($i) 30
+}
 
-#Detach tcp and sink agents (not really necessary)
-$ns at 4.5 "$ns detach-agent $n0 $tcp ; $ns detach-agent $n3 $sink"
+for {set i 0} {$i < $val(nn) } { incr i } {
+    $ns at $val(stop) "$node_($i) reset";
+}
 
-#Call the finish procedure after 5 seconds of simulation time
-$ns at 5.0 "finish"
-
-
-#Run the simulation
+$ns at $val(stop) "$ns nam-end-wireless $val(stop)"
+$ns at $val(stop) "stop"
+$ns at 150.01 "puts \"end simulation\" ; $ns halt"
+proc stop {} {
+    global ns tracefd namtrace
+    $ns flush-trace
+    close $tracefd
+    close $namtrace
+    exec nam dsr.nam &
+    exit 0
+}
 $ns run
-
