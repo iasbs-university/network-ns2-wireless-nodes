@@ -3,25 +3,25 @@
 # --- 11-02-2016
 # --- Implementation scenarios wireless connection, two nodes by other wireless node 
 
-set val(chan)           Channel/WirelessChannel    ;# channel type
-set val(prop)           Propagation/TwoRayGround   ;# radio- 
-set val(netif)          Phy/WirelessPhy            ;# network 
-set val(mac)            Mac/802_11                 ;# MAC type
-set val(ifq)            Queue/DropTail/PriQueue    ;# interface queue 
-set val(ll)             LL                         ;# link layer type
-set val(ant)            Antenna/OmniAntenna        ;# antenna model
-set val(ifqlen)         50                         ;# max packet in ifq
-set val(nn)             3                          ;# number of mobile
-set val(rp)             DSR                        ;# routing protocol
-set val(x)              500                        ;# routing protocol
-set val(y)              400                        ;# routing protocol
-set val(stop)           150                        ;# routing protocol
+set val(chan)           Channel/WirelessChannel    ;
+set val(prop)           Propagation/TwoRayGround   ;
+set val(netif)          Phy/WirelessPhy            ;
+set val(mac)            Mac/802_11                 ;
+set val(ifq)            Queue/DropTail/PriQueue    ; 
+set val(ll)             LL                         ;
+set val(ant)            Antenna/OmniAntenna        ;
+set val(ifqlen)         50                         ;
+set val(nn)             3                          ;
+set val(rp)             DSR                        ;
+set val(x)              500                        ;
+set val(y)              400                        ;
+set val(stop)           150                        ;
 
 set ns              [new Simulator]
 
-set tracefd       [open dsr.tr w]
+set tracefd       [open first.tr w]
 set windowVsTime2 [open win.tr w]
-set namtrace      [open dsr.nam w]   
+set namtrace      [open first.nam w]   
 
 $ns trace-all $tracefd
 $ns namtrace-all-wireless $namtrace $val(x) $val(y)
@@ -74,7 +74,6 @@ set ftp [new Application/FTP]
 $ftp attach-agent $tcp
 $ns at 0.0 "$ftp start"
 
-# Printing the window size
 proc plotWindow {tcpSource file} {
 global ns
 set time 0.01
@@ -100,7 +99,7 @@ proc stop {} {
     $ns flush-trace
     close $tracefd
     close $namtrace
-    exec nam dsr.nam &
+    exec nam first.nam &
     exit 0
 }
 $ns run
